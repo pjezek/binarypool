@@ -135,24 +135,33 @@ class S3 {
 		$results = array();
 
 		$lastMarker = null;
-		if (isset($response->body, $response->body->Contents))
-			foreach ($response->body->Contents as $c) {
-				$results[(string)$c->Key] = array(
-					'name' => (string)$c->Key,
-					'time' => strtotime((string)$c->LastModified),
-					'size' => (int)$c->Size,
-					'hash' => substr((string)$c->ETag, 1, -1)
+		if (isset($response->body)) {
+		    $dom = new DOMDocument();
+		    $dom->loadXML($response->body);
+		    $xp = new DOMXPath($dom);
+		    $xp->registerNamespace('s3', 'http://s3.amazonaws.com/doc/2006-03-01/');
+		    foreach ($xp->query('/s3:ListBucketResult/s3:Contents') as $contents) {
+		        $key = $xp->query('s3:Key', $contents)->item(0)->nodeValue;
+		        $lastModified = $xp->query('s3:LastModified', $contents)->item(0)->nodeValue;
+		        $size = $xp->query('s3:Size', $contents)->item(0)->nodeValue;
+		        $etag = $xp->query('s3:ETag', $contents)->item(0)->nodeValue;
+				$results[(string)$key] = array(
+					'name' => (string)$key,
+					'time' => strtotime((string)$lastModified),
+					'size' => (int)$size,
+					'hash' => substr((string)$etag, 1, -1)
 				);
-				$lastMarker = (string)$c->Key;
-				//$response->body->IsTruncated = 'true'; break;
+				$lastMarker = (string)$key;
 			}
+		}
 
 
-		if (isset($response->body->IsTruncated) &&
-		(string)$response->body->IsTruncated == 'false') return $results;
+		if (self::getTruncated($response->body) === false) {
+		    return $results;
+	    }
 
 		// Loop through truncated results if maxKeys isn't specified
-		if ($maxKeys == null && $lastMarker !== null && (string)$response->body->IsTruncated == 'true')
+		if ($maxKeys == null && $lastMarker !== null && self::getTruncated($response->body))
 		do {
 			$rest = new S3Request('GET', $bucket, '');
 			if ($prefix !== null) $rest->setParameter('prefix', $prefix);
@@ -169,9 +178,21 @@ class S3 {
 					);
 					$lastMarker = (string)$c->Key;
 				}
-		} while ($response !== false && (string)$response->body->IsTruncated == 'true');
+		} while ($response !== false && self::getTruncated($response->body));
 
 		return $results;
+	}
+	
+	protected static function getTruncated($xml) {
+	    $dom = new DOMDocument();
+	    $xp = new DOMXPath($dom);
+	    $xp->registerNamespace('s3', 'http://s3.amazonaws.com/doc/2006-03-01/');
+	    $truncated = $xp->query('//s3:IsTruncated');
+	    if ($truncated->length == 0) {
+	        return false;
+	    } else {
+	        return ($truncated->item(0)->nodeValue == 'true');
+	    }
 	}
 
 
@@ -911,9 +932,10 @@ final class S3Request {
 		    $dom = new DOMDocument();
 		    $dom->loadXML($this->response->body);
 		    $xp = new DOMXPath($dom);
-		    $codeXp = $xp->query('/Error/Code');
-		    $messageXp = $xp->query('/Error/Message');
-		    $resourceXp = $xp->query('/Error/Resource');
+		    $xp->registerNamespace('s3', 'http://s3.amazonaws.com/doc/2006-03-01/');
+		    $codeXp = $xp->query('/s3:Error/s3:Code');
+		    $messageXp = $xp->query('/s3:Error/s3:Message');
+		    $resourceXp = $xp->query('/s3:Error/s3:Resource');
 		    $code = $codeXp->length == 0 ? null : $codeXp->item(0)->nodeValue;
 		    $message = $messageXp->length == 0 ? null : $messageXp->item(0)->nodeValue;
 		    $resource = $resourceXp->length == 0 ? null : $resourceXp->item(0)->nodeValue;
