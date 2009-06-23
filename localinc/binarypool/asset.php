@@ -206,14 +206,14 @@ class binarypool_asset {
             throw new binarypool_exception(102, 404, "Referenced file in asset does not exist: $file");
         }
 
-        $fileinfo = binarypool_fileinfo::getFileinfo($file);
+        $fileinfo = binarypool_fileinfo::getFileinfo($fproxy->file);
         $mime = $fileinfo['mime'];
         $size = $fileinfo['size'];
         $hash = $fileinfo['hash'];
         $type = is_null($this->type) ?
             binarypool_render::getType($mime) :
             $this->type;
-        $info = binarypool_mime::getImageSize($file, $mime, $type);
+        $info = binarypool_mime::getImageSize($fproxy->file, $mime, $type);
         $isRendition = is_null($rendition) ? 'false' : 'true';
         $isLandscape = ($info['width'] > $info['height']) ? 'true' : 'false';
         
