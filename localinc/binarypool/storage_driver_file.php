@@ -185,7 +185,13 @@ class binarypool_storage_driver_file extends binarypool_storage_driver {
             symlink($target, $link);
         }
     }
-    
+
+    public function removeSymlink($link) {
+        if ($this->fileExists($link)) {
+            $this->unlink($link);
+        }
+    }
+
     public function relink($target, $link) {
         $this->clearstatcache();
         $link = $this->absolutize($link);

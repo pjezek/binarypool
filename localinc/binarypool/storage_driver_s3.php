@@ -33,12 +33,24 @@ class binarypool_storage_driver_s3 extends binarypool_storage_driver {
         return $this->cfg['base_url'] . ltrim($file, '/');
     }
 
+    /**
+     * Return a URL which does not point to CloudFront so we don't run into
+     * caching issues for this file.
+     */
+    public function getInternalAbsolute($file) {
+        return 'http://' . $this->cfg['bucket'] . '.s3.amazonaws.com/' .
+            ltrim($file, '/');
+    }
+
     public function save($local_file, $remote_file) {
+        $remote_file = ltrim($remote_file, '/');
         $url = $this->absolutize($remote_file);
+        $urlInternal = $this->getInternalAbsolute($remote_file);
 
         // Cache the fileinfo
-        binarypool_fileinfo::setCache($url,
-            binarypool_fileinfo::getFileinfo($local_file));
+        $info = binarypool_fileinfo::getFileinfo($local_file);
+        binarypool_fileinfo::setCache($url, $info);
+        binarypool_fileinfo::setCache($urlInternal, $info);
 
         $this->removeCache($remote_file);
         $this->flushCache($remote_file);
@@ -174,6 +186,7 @@ class binarypool_storage_driver_s3 extends binarypool_storage_driver {
         }
 
         $file = ltrim($file, '/');
+        $info = false;
         try {
             $info = $this->client->getObjectInfo(
                 $this->cfg['bucket'], $file, false);
@@ -277,13 +290,25 @@ class binarypool_storage_driver_s3 extends binarypool_storage_driver {
         $retval = array();
         
         foreach ($files as $file) {
+            $symlink = null;
             $path = $file['name'];
             if (strrpos($path, '.link') === strlen($path)-5) {
+                $symlink = $path;
                 $path = $this->resolveSymlink($path);
             }
-            if (strpos($path, 'index.xml') !== false) {
+            if (strpos($path, 'index.xml') === false) {
+                $path .= '/index.xml';
+            }
+            try {
                 $asset = new binarypool_asset($this, $path);
                 array_push($retval, $asset->getBasePath() . 'index.xml');
+            } catch (binarypool_exception $e) {
+                if ($e->getCode() === 112 && $symlink !== null) {
+                    // Asset file doesn't exist anymore, remove the link
+                    $this->unlink($symlink);
+                } else {
+                    throw $e;
+                }
             }
         }
         return $retval;
@@ -296,7 +321,7 @@ class binarypool_storage_driver_s3 extends binarypool_storage_driver {
         $this->flushCache($file);
         return $retval;
     }
-    
+
     public function symlink($target, $link) {
         $link = $this->correctSymlinkName($link);
         
@@ -305,9 +330,13 @@ class binarypool_storage_driver_s3 extends binarypool_storage_driver {
         }
         
         $this->writeSymlink($target, $link);
-        
     }
-    
+
+    public function removeSymlink($link) {
+        $link = $this->correctSymlinkName($link);
+        $this->unlink($link);
+    }
+
     public function relink($target, $link) {
         $link = $this->correctSymlinkName($link);
         $this->writeSymlink($target, $link);
@@ -384,7 +413,9 @@ class binarypool_storage_driver_s3 extends binarypool_storage_driver {
     
     protected function flushCache($file) {
         $url = $this->absolutize($file);
+        $urlInternal = $this->getInternalAbsolute($file);
         binarypool_fileobject::forgetCache($url);
+        binarypool_fileobject::forgetCache($urlInternal);
         $this->cache->del($this->getCacheKey($file));
         $this->cache->del('isfile_' . $this->getCacheKey($file));
         $this->cache->del('isdir_' . $this->getCacheKey($file));

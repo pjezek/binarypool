@@ -31,6 +31,7 @@ class api_command_create extends api_command_base {
         $files = $this->getFiles();
         $url = $this->request->getParam('URL');
         $created = true;
+        $oldAssetObj = null;
         
         $storage = new binarypool_storage($bucket);
         
@@ -40,7 +41,12 @@ class api_command_create extends api_command_base {
             $asset = $storage->getAssetForLink($symlink);
             $this->log->info("Unmodified file %s", $asset);
             $created = false;
+            $oldAssetObj = $storage->getAssetObject($asset);
         } else {
+            if (($asset = $storage->uploadedFilesExist($files)) !== false) {
+                $created = false;
+                $oldAssetObj = $storage->getAssetObject($asset);
+            }
             // Save file
             $asset = $storage->save($type, $files);
             $this->log->info("Created file %s", $asset);
@@ -59,8 +65,10 @@ class api_command_create extends api_command_base {
         if ($created) {
             binarypool_views::created($bucket, $asset, $metadata);
         } else {
-            $assetObj = $storage->getAssetObject($asset);
-            binarypool_views::updated($bucket, $asset, $assetObj, $metadata);
+            if (is_null($oldAssetObj)) {
+                $oldAssetObj = $storage->getAssetObject($asset);
+            }
+            binarypool_views::updated($bucket, $asset, $oldAssetObj, $metadata);
         }
         
         $this->setResponseCode(201);
@@ -203,5 +211,10 @@ class api_command_create extends api_command_base {
                 unlink($file);
             }
         }
+    }
+    
+    protected function touch($asset) {
+        $cmd = new api_command_touch($this->route);
+        $cmd->touch($this->bucket, '/' . $asset);
     }
 }

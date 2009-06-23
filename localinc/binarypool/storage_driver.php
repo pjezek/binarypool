@@ -156,6 +156,14 @@ abstract class binarypool_storage_driver {
     public abstract function symlink($target, $link);
     
     /**
+     * Remove a symlink.
+     *
+     * @param $link string:   Path of the symlink to rempve, relative to
+     *                        the storage root.
+     */
+    public abstract function removeSymlink($link);
+    
+    /**
      * Refresh an existing symlink (meaning it's timestamp get's updated).
      * If it doesn't exist, create it
      * 

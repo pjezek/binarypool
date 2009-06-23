@@ -15,7 +15,7 @@ class api_command_touch extends api_command_base {
         $this->ignoreView = true;
     }
     
-    protected function touch($bucket, $uri) {
+    public function touch($bucket, $uri) {
         $storage = new binarypool_storage($bucket);
         $assetFile = $uri;
         

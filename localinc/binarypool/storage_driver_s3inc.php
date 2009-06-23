@@ -116,7 +116,12 @@ class binarypool_storage_driver_s3inc extends binarypool_storage_driver {
     public function symlink($target, $link) {
         $this->s3->symlink($target, $link);
     }
-    
+
+    public function removeSymlink($link) {
+        $this->s3->removeSymlink($link);
+        $this->local->removeSymlink($link);
+    }
+
     public function relink($target, $link) {
         $this->s3->relink($target, $link);
     }
@@ -148,7 +153,7 @@ class binarypool_storage_driver_s3inc extends binarypool_storage_driver {
      * them from S3 directly.
      */
     protected function getTransformedIndexFile($file) {
-        $url = $this->s3->absolutize($file);
+        $url = $this->s3->getInternalAbsolute($file);
         $fproxy = new binarypool_fileobject($url);
         if ( !$fproxy->exists() ) {
             return null;

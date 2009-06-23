@@ -142,6 +142,25 @@ class binarypool_storage {
     }
     
     /**
+     * Checks if a file that is about to be uploaded already exists.
+     * Returns the asset path if it exists, false otherwise.
+     */
+    public function uploadedFilesExist($files) {
+        if (!isset($files['_']) || !isset($files['_']['file'])
+                                || !is_file($files['_']['file'])) {
+            // Leave real validation to save command.
+            return false;
+        }
+
+        $sha1 = sha1_file($files['_']['file']);
+        try {
+            return $this->getAssetBySha1($sha1);
+        } catch (binarypool_exception $e) {
+            return false;
+        }
+    }
+
+    /**
      * Adds a new callback to an existing asset file.
      */
     public function addCallback($asset, $callback) {
@@ -155,9 +174,13 @@ class binarypool_storage {
     private function createAssetFile($assetFile, $assetObj, $dir, $originalFile,
             $renditions, $type) {
         $asset = null;
+        $newExpiry = time() + (intval($this->bucketConfig['ttl']) * 24 * 60 * 60);
         
         if ($originalFile === null || $renditions === null) {
-            // Nothing to save, just writing an existing file
+            // Nothing change. But do update the expiry date
+            $asset = $this->getAssetObject($assetFile);
+            $asset->setExpiry($newExpiry);
+            $this->saveAsset($asset, $assetFile);
             return $assetFile;
         }
         
@@ -181,7 +204,7 @@ class binarypool_storage {
         if (! isset($this->bucketConfig['ttl'])) {
             throw new BinaryPoolException(116, 500, 'Bucket does not have a defined TTL: ' . $this->bucketName);
         }
-        $asset->setExpiry(time() + (intval($this->bucketConfig['ttl']) * 24 * 60 * 60));
+        $asset->setExpiry($newExpiry);
         $asset->setType($type);
         
         // Done
@@ -265,7 +288,21 @@ class binarypool_storage {
         
         $date = date('Y/m/d');
         $trashDir = 'Trash/' . $date . '/' . $basepath;
+
+        // Remove "created" symlinks
+        $fullDateDir = $this->bucketName . '/created/' .
+            date('Y/m/d', $assetObj->getCreated()) . '/' .
+            $assetObj->getHash() . '.link';
+        $this->storage->removeSymlink($fullDateDir);
+
+        // Remove actual file
         $this->storage->rename($basepath, $trashDir);
+
+        // Remove "expiry" symlink (has to be removed last)
+        $fullDateDir = $this->bucketName . '/expiry/' .
+            date('Y/m/d', $assetObj->getExpiry()) . '/' .
+            $assetObj->getHash() . '.link';
+        $this->storage->removeSymlink($fullDateDir);
     }
 
     /**
