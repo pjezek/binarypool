@@ -67,13 +67,18 @@ class binarypool_render_image extends binarypool_render_base {
         switch ($mime) {
            case 'image/pdf':
            case 'application/pdf':
-               $cmd .= ' -trim';
-               break;
+                $cmd .= ' -trim';
+                break;
            case 'image/gif';
-               break;
+                // Detect animated gifs by counting the number of frames
+                $frames = exec("identify -format '%n' ". escapeshellarg($from));
+                if ( $frames > 1) {
+                    $from = self::coalesceAnimatedGif($from);
+                }
+                break;
            default:
-               $cmd .= ' -flatten';
-               break;
+                $cmd .= ' -flatten';
+                break;
         }
 
         if ($maxWidth != '') {
@@ -96,6 +101,25 @@ class binarypool_render_image extends binarypool_render_base {
         $log = new api_log();
         $log->debug("Resizing image using command: $cmd");
         shell_exec($cmd);
+    }
+    
+    /**
+     * For animated gifs, we first need to coalesce them.
+     * See: https://fosswiki.liip.ch/display/BLOG/Resizing+animated+GIFs+with+ImageMagick
+     */
+    protected static function coalesceAnimatedGif($from) {
+        $dir = dirname($from);
+        $to = $dir . '/c_' . basename($from);
+        $log = new api_log();
+        
+        if ( !file_exists($to) ) {
+            $cmd = 'convert '. escapeshellarg($from) . ' -coalesce ' . escapeshellarg($to);
+            $log->debug("Animated gif detected - coalescing using command: $cmd");
+            shell_exec($cmd);
+        } else {
+            $log->debug("Animated gif detected - already coalesced to $to");
+        }
+        return $to;
     }
     
     /**
