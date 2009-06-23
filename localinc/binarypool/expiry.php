@@ -18,7 +18,7 @@ class binarypool_expiry {
         
         if ($obj->getExpiry() > time()) {
             // Item expires in the future
-            return false;
+            return $obj;
         }
         
         // Check callbacks
@@ -26,7 +26,10 @@ class binarypool_expiry {
             $status = self::getCallbackOpinion($callback);
             if ($status === FALSE) {
                 // Permission not granted
-                return false;
+                $buckets = binarypool_config::getBuckets();
+                $ttl = intval($buckets[$bucket]['ttl']);
+                $obj->setExpiry(time() + ($ttl * 24 * 60 * 60));
+                return $obj;
             }
         }
         

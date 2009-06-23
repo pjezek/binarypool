@@ -43,7 +43,9 @@ class BinarypoolExpiryTest extends BinarypoolTestCase {
      */
     function testExpiredEmptyAssetInFuture() {
         $asset = $this->createAsset(array(), -1);
-        $this->assertFalse(binarypool_expiry::isExpired('test', $asset));
+        $retval = binarypool_expiry::isExpired('test', $asset);
+        $assetObj = new binarypool_asset($this->getDummyStorage(), $asset);
+        $this->assertEqual($retval, $assetObj);
     }
     
     /**
@@ -51,7 +53,9 @@ class BinarypoolExpiryTest extends BinarypoolTestCase {
      */
     function testAliveNonexistingCallback() {
         $asset = $this->createAsset(array('/tmp/absolutely_invalid_callback'));
-        $this->assertFalse(binarypool_expiry::isExpired('test', $asset));
+        $retval = binarypool_expiry::isExpired('test', $asset);
+        $this->assertWithinMargin(time() + 604800, $retval->getExpiry(), 10);
+        $this->assertIsA($retval, 'binarypool_asset');
     }
     
     /**
@@ -60,7 +64,9 @@ class BinarypoolExpiryTest extends BinarypoolTestCase {
     function testAliveInvalidCallback1() {
         file_put_contents("/tmp/invalid_callback", "EXPIRED1");
         $asset = $this->createAsset(array('/tmp/invalid_callback'));
-        $this->assertFalse(binarypool_expiry::isExpired('test', $asset));
+        $retval = binarypool_expiry::isExpired('test', $asset);
+        $this->assertWithinMargin(time() + 604800, $retval->getExpiry(), 10);
+        $this->assertIsA($retval, 'binarypool_asset');
     }
 
     /**
@@ -69,7 +75,9 @@ class BinarypoolExpiryTest extends BinarypoolTestCase {
     function testAliveInvalidCallback2() {
         file_put_contents("/tmp/invalid_callback", "OK");
         $asset = $this->createAsset(array('/tmp/invalid_callback'));
-        $this->assertFalse(binarypool_expiry::isExpired('test', $asset));
+        $retval = binarypool_expiry::isExpired('test', $asset);
+        $this->assertWithinMargin(time() + 604800, $retval->getExpiry(), 10);
+        $this->assertIsA($retval, 'binarypool_asset');
     }
 
     /**
@@ -78,7 +86,9 @@ class BinarypoolExpiryTest extends BinarypoolTestCase {
     function testAliveInvalidCallback3() {
         file_put_contents("/tmp/invalid_callback", "expired");
         $asset = $this->createAsset(array('/tmp/invalid_callback'));
-        $this->assertFalse(binarypool_expiry::isExpired('test', $asset));
+        $retval = binarypool_expiry::isExpired('test', $asset);
+        $this->assertWithinMargin(time() + 604800, $retval->getExpiry(), 10);
+        $this->assertIsA($retval, 'binarypool_asset');
     }
 
     /**
@@ -87,7 +97,9 @@ class BinarypoolExpiryTest extends BinarypoolTestCase {
     function testAliveInvalidCallback4() {
         file_put_contents("/tmp/invalid_callback", " EXPIRED");
         $asset = $this->createAsset(array('/tmp/invalid_callback'));
-        $this->assertFalse(binarypool_expiry::isExpired('test', $asset));
+        $retval = binarypool_expiry::isExpired('test', $asset);
+        $this->assertWithinMargin(time() + 604800, $retval->getExpiry(), 10);
+        $this->assertIsA($retval, 'binarypool_asset');
     }
 
     /**
@@ -95,7 +107,9 @@ class BinarypoolExpiryTest extends BinarypoolTestCase {
      */
     function testAliveInvalidCallbackURL() {
         $asset = $this->createAsset(array('http://www.trunk.local.ch/static/ibc'));
-        $this->assertFalse(binarypool_expiry::isExpired('test', $asset));
+        $retval = binarypool_expiry::isExpired('test', $asset);
+        $this->assertWithinMargin(time() + 604800, $retval->getExpiry(), 10);
+        $this->assertIsA($retval, 'binarypool_asset');
     }
     
     /**
@@ -103,7 +117,6 @@ class BinarypoolExpiryTest extends BinarypoolTestCase {
      */
     function testExpiredWithCallback() {
         file_put_contents("/tmp/deleteme_callback", "EXPIRED");
-        
         $asset = $this->createAsset(array('/tmp/deleteme_callback'));
         $this->assertTrue(binarypool_expiry::isExpired('test', $asset));
     }

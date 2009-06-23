@@ -12,19 +12,23 @@ class binarypool_browser {
      *
      * All the returned file names are relative paths.
      */
-    public static function getExpired($bucket) {
-        $files = array();
+    public static function getExpired($bucket, $limitDate = null) {
         $storage = new binarypool_storage($bucket);
-        
-        for ($day = 0; $day < 100; $day++) {
-            // Date directory for given day
-            $dateDir = date('Y/m/d', time() - ($day * 24 * 60 * 60));
-            
+
+        if ($limitDate !== null) {
             // Get all asset files which expired in those days
-            $retval = $storage->listDir('expiry/' . $dateDir);
-            $files = array_merge($files, $retval);
+            return $storage->listDir('expiry/' . $limitDate);
+        } else {
+            $files = array();
+            for ($day = 0; $day < 100; $day++) {
+                // Date directory for given day
+                $dateDir = date('Y/m/d', time() - ($day * 24 * 60 * 60));
+
+                // Get all asset files which expired in those days
+                $retval = $storage->listDir('expiry/' . $dateDir);
+                $files = array_merge($files, $retval);
+            }
+            return $files;
         }
-        
-        return $files;
     }
 }
